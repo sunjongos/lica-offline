@@ -1,8 +1,8 @@
-<![CDATA[# 🤖 LUCA Offline — Local LLMs In-Code Assistant for VS Code / Antigravity
+<![CDATA[# 🤖 LUCA Offline — Local Unified Coding Assistant for VS Code / Antigravity
 
 > **인터넷 없이도 동작하는 로컬 AI 코딩 어시스턴트 Extension**  
 > A fully offline AI coding assistant powered by local Ollama LLMs, built as a VS Code / Antigravity sidebar extension.  
-> **LUCA** = **L**ocal **L**LMs **I**n-**C**ode **A**ssistant
+> **LUCA** = **L**ocal **U**nified **C**oding **A**ssistant
 
 ![VS Code Version](https://img.shields.io/badge/VS_Code-1.85+-blue?logo=visualstudiocode)
 ![Ollama](https://img.shields.io/badge/Ollama-local_LLM-green?logo=ollama)
@@ -94,7 +94,7 @@ ollama serve
 
 #### Option A: VSIX 직접 설치 (권장)
 ```bash
-antigravity --install-extension luca-offline-1.1.0.vsix
+antigravity --install-extension luca-offline-1.2.1.vsix
 ```
 
 #### Option B: 소스에서 빌드
@@ -104,7 +104,7 @@ cd luca-offline-localLLM
 npm install
 npm run compile
 npx vsce package --no-dependencies
-code --install-extension luca-offline-1.1.0.vsix
+code --install-extension luca-offline-1.2.1.vsix
 ```
 
 ---

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.1] - 2026-04-15
+### 📛 Branding Finalization
+- 확장 프로그램 부제를 'Local Unified Coding Assistant'로 최종 변경하여 완벽한 LUCA 브랜딩 달성
+- AI 인턴(코드명: E4B)의 외부 호칭을 '루카(LUCA)'로 통일
+
 ## [1.1.0] - 2026-04-15
 
 ### 🖼️ Multimodal Image Support
@@ -16,7 +21,7 @@
 - VS Code / Antigravity / Cursor 자동 감지
 
 ### 📛 Branding
-- LUCA (Local LLMs In-Code Assistant) 브랜딩 적용
+- LUCA (Local Unified Coding Assistant) 브랜딩 적용
 - 드래그 오버레이 UI, 이미지 미리보기 바 추가
 - 포커스 글로우 효과, 퍼플 테마 강화
 
