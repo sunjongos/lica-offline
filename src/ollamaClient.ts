@@ -5,6 +5,7 @@ import * as url from 'url';
 export interface OllamaMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  images?: string[];  // base64-encoded image data (no prefix)
 }
 
 export interface OllamaModel {
@@ -95,7 +96,7 @@ export class OllamaClient {
   }
 
   /**
-   * Stream a chat completion from Ollama
+   * Stream a chat completion from Ollama (supports multimodal images)
    */
   async chatStream(
     model: string,
@@ -105,11 +106,20 @@ export class OllamaClient {
     onError: (error: Error) => void,
     abortSignal?: { aborted: boolean }
   ): Promise<void> {
-    const body = JSON.stringify({
+    // Build payload — include images field only when present
+    const payload: any = {
       model,
-      messages,
+      messages: messages.map((m) => {
+        const msg: any = { role: m.role, content: m.content };
+        if (m.images && m.images.length > 0) {
+          msg.images = m.images;
+        }
+        return msg;
+      }),
       stream: true,
-    });
+    };
+
+    const body = JSON.stringify(payload);
 
     const parsed = new url.URL(this.baseUrl);
     const options: http.RequestOptions = {
@@ -121,7 +131,7 @@ export class OllamaClient {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
       },
-      timeout: 120000,
+      timeout: 180000,  // 3 min for vision models
     };
 
     const req = http.request(options, (res) => {
@@ -176,7 +186,7 @@ export class OllamaClient {
     req.on('error', (err) => onError(err));
     req.on('timeout', () => {
       req.destroy();
-      onError(new Error('Ollama 서버 응답 타임아웃 (120초 초과)'));
+      onError(new Error('Ollama 서버 응답 타임아웃 (180초 초과)'));
     });
 
     req.write(body);
@@ -184,15 +194,23 @@ export class OllamaClient {
   }
 
   /**
-   * Non-streaming chat (for simple queries)
+   * Non-streaming chat (for simple queries, supports multimodal)
    */
   async chat(model: string, messages: OllamaMessage[]): Promise<string> {
     return new Promise((resolve, reject) => {
-      const body = JSON.stringify({
+      const payload: any = {
         model,
-        messages,
+        messages: messages.map((m) => {
+          const msg: any = { role: m.role, content: m.content };
+          if (m.images && m.images.length > 0) {
+            msg.images = m.images;
+          }
+          return msg;
+        }),
         stream: false,
-      });
+      };
+
+      const body = JSON.stringify(payload);
 
       const parsed = new url.URL(this.baseUrl);
       const options: http.RequestOptions = {
@@ -204,7 +222,7 @@ export class OllamaClient {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(body),
         },
-        timeout: 120000,
+        timeout: 180000,
       };
 
       const req = http.request(options, (res) => {

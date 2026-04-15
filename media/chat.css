@@ -1,13 +1,14 @@
-/* ===== Luca Offline Chat — VS Code Native Theme ===== */
+/* ===== LICA Offline Chat — Multimodal VS Code Theme ===== */
 
 :root {
-  --luca-accent: #7c3aed;
-  --luca-accent-hover: #6d28d9;
-  --luca-user-bg: rgba(124, 58, 237, 0.12);
-  --luca-assistant-bg: rgba(255, 255, 255, 0.04);
-  --luca-border: rgba(255, 255, 255, 0.08);
-  --luca-radius: 10px;
-  --luca-code-bg: rgba(0, 0, 0, 0.3);
+  --lica-accent: #7c3aed;
+  --lica-accent-hover: #6d28d9;
+  --lica-accent-glow: rgba(124, 58, 237, 0.25);
+  --lica-user-bg: rgba(124, 58, 237, 0.12);
+  --lica-assistant-bg: rgba(255, 255, 255, 0.04);
+  --lica-border: rgba(255, 255, 255, 0.08);
+  --lica-radius: 10px;
+  --lica-code-bg: rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -39,7 +40,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--luca-border);
+  border-bottom: 1px solid var(--lica-border);
   background: var(--vscode-sideBarSectionHeader-background, rgba(255,255,255,0.03));
   flex-shrink: 0;
 }
@@ -55,9 +56,10 @@ body {
 }
 
 .header-title {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
   color: var(--vscode-foreground);
+  letter-spacing: 0.5px;
 }
 
 .header-right {
@@ -154,14 +156,14 @@ body {
 .welcome-message h3 {
   font-size: 16px;
   font-weight: 700;
-  color: var(--luca-accent);
+  color: var(--lica-accent);
 }
 .welcome-message p {
   font-size: 12px;
   line-height: 1.5;
 }
 .welcome-message .hint {
-  margin-top: 8px;
+  margin-top: 4px;
   opacity: 0.6;
   font-size: 11px;
 }
@@ -177,7 +179,7 @@ body {
 /* Message containers */
 .message {
   padding: 10px 12px;
-  border-radius: var(--luca-radius);
+  border-radius: var(--lica-radius);
   line-height: 1.6;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -190,12 +192,12 @@ body {
 }
 
 .message.user {
-  background: var(--luca-user-bg);
-  border-left: 3px solid var(--luca-accent);
+  background: var(--lica-user-bg);
+  border-left: 3px solid var(--lica-accent);
 }
 
 .message.assistant {
-  background: var(--luca-assistant-bg);
+  background: var(--lica-assistant-bg);
   border-left: 3px solid rgba(74, 222, 128, 0.5);
 }
 
@@ -214,8 +216,31 @@ body {
   opacity: 0.6;
 }
 
-.message.user .message-role { color: var(--luca-accent); }
+.message.user .message-role { color: var(--lica-accent); }
 .message.assistant .message-role { color: #4ade80; }
+
+/* ===== Message Images (inline in chat) ===== */
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.message-image {
+  max-width: 200px;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.message-image:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+}
 
 /* ===== Markdown Rendering ===== */
 .message-content p { margin: 4px 0; }
@@ -235,7 +260,7 @@ body {
 
 /* Inline code */
 .message-content code:not(.block-code) {
-  background: var(--luca-code-bg);
+  background: var(--lica-code-bg);
   padding: 1px 5px;
   border-radius: 3px;
   font-family: var(--vscode-editor-font-family, 'Cascadia Code', 'Fira Code', monospace);
@@ -296,7 +321,7 @@ body {
 .streaming-cursor::after {
   content: '▋';
   animation: blink 0.8s infinite;
-  color: var(--luca-accent);
+  color: var(--lica-accent);
   font-weight: bold;
 }
 
@@ -308,7 +333,7 @@ body {
 /* ===== Input Area ===== */
 #input-area {
   padding: 8px 12px 12px 12px;
-  border-top: 1px solid var(--luca-border);
+  border-top: 1px solid var(--lica-border);
   background: var(--vscode-sideBar-background, #1e1e2e);
   flex-shrink: 0;
 }
@@ -333,18 +358,110 @@ body {
   background: rgba(239, 68, 68, 0.25);
 }
 
+/* ===== Image Preview Bar ===== */
+#image-preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+  align-items: center;
+}
+
+#image-preview-bar.hidden {
+  display: none;
+}
+
+.image-thumb-wrapper {
+  position: relative;
+  display: inline-block;
+  animation: thumbPop 0.25s ease;
+}
+
+@keyframes thumbPop {
+  from { transform: scale(0.7); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.image-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid var(--lica-accent);
+  box-shadow: 0 2px 8px var(--lica-accent-glow);
+  cursor: default;
+  transition: border-color 0.2s;
+}
+
+.image-thumb:hover {
+  border-color: #a78bfa;
+}
+
+.image-thumb-remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  transition: transform 0.15s;
+}
+
+.image-thumb-remove:hover {
+  transform: scale(1.2);
+  background: #dc2626;
+}
+
+/* ===== Input Wrapper ===== */
 .input-wrapper {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
   background: var(--vscode-input-background, #313244);
   border: 1px solid var(--vscode-input-border, rgba(255,255,255,0.1));
   border-radius: 8px;
   padding: 6px 8px;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .input-wrapper:focus-within {
-  border-color: var(--luca-accent);
+  border-color: var(--lica-accent);
+  box-shadow: 0 0 0 2px var(--lica-accent-glow);
+}
+
+.input-actions {
+  display: flex;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+#btn-attach {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+#btn-attach:hover {
+  background: rgba(124, 58, 237, 0.15);
+  color: var(--lica-accent);
 }
 
 #user-input {
@@ -366,7 +483,7 @@ body {
 }
 
 #btn-send {
-  background: var(--luca-accent);
+  background: var(--lica-accent);
   border: none;
   color: white;
   width: 28px;
@@ -380,9 +497,50 @@ body {
   transition: background 0.15s;
 }
 #btn-send:hover {
-  background: var(--luca-accent-hover);
+  background: var(--lica-accent-hover);
 }
 #btn-send:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ===== Drag & Drop Overlay ===== */
+#drop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(124, 58, 237, 0.15);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+#drop-overlay.hidden {
+  display: none;
+}
+
+.drop-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--lica-accent);
+  font-size: 16px;
+  font-weight: 700;
+  padding: 32px 48px;
+  border: 3px dashed var(--lica-accent);
+  border-radius: 16px;
+  background: rgba(124, 58, 237, 0.08);
+  animation: pulse-border 1.5s ease infinite;
+}
+
+.drop-icon {
+  font-size: 48px;
+}
+
+@keyframes pulse-border {
+  0%, 100% { border-color: var(--lica-accent); }
+  50% { border-color: rgba(124, 58, 237, 0.3); }
 }

@@ -41,7 +41,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.type) {
         case 'sendMessage':
-          await this._handleUserMessage(data.text);
+          await this._handleUserMessage(data.text, data.images || []);
           break;
         case 'switchModel':
           await this._switchModel();
@@ -54,6 +54,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         case 'insertCode':
           this._insertCodeToEditor(data.code);
+          break;
+        case 'pickImage':
+          await this._pickImageFile();
           break;
         case 'ready':
           this._sendModelsToWebview();
@@ -99,9 +102,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Handle incoming user message
+   * Handle incoming user message (optionally with images)
    */
-  private async _handleUserMessage(userText: string): Promise<void> {
+  private async _handleUserMessage(userText: string, images: string[] = []): Promise<void> {
     if (!this._view) {return;}
 
     // Get config
@@ -120,20 +123,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this._messages.push({ role: 'system', content: fullSystemPrompt });
     }
 
-    // Add user message
-    this._messages.push({ role: 'user', content: userText });
+    // Build user message with optional images
+    const userMessage: OllamaMessage = { role: 'user', content: userText };
+    if (images.length > 0) {
+      // Strip data URI prefix to get pure base64
+      userMessage.images = images.map((img) => {
+        const match = img.match(/^data:[^;]+;base64,(.+)$/);
+        return match ? match[1] : img;
+      });
+    }
+    this._messages.push(userMessage);
 
-    // Show user message in webview
+    // Show user message in webview (include image data URIs for display)
     this._view.webview.postMessage({
       type: 'addMessage',
       role: 'user',
       content: userText,
+      images: images,  // full data URIs for display
     });
 
     // Start streaming response
     this._view.webview.postMessage({ type: 'startStreaming' });
     this._abortSignal = { aborted: false };
-    this._updateStatusBar('$(loading~spin) 인턴 응답 중...', 'warning');
+    this._updateStatusBar('$(loading~spin) 응답 중...', 'warning');
 
     let fullResponse = '';
 
@@ -171,6 +183,46 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         message: `Ollama 서버 연결 실패: ${err.message}\n\n💡 'ollama serve' 명령어로 서버를 시작해주세요.`,
       });
       this._updateStatusBar('$(error) Ollama 오프라인', 'error');
+    }
+  }
+
+  /**
+   * Open native file picker and send image to webview
+   */
+  private async _pickImageFile(): Promise<void> {
+    const fileUris = await vscode.window.showOpenDialog({
+      canSelectMany: true,
+      filters: {
+        'Images': ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'],
+      },
+      openLabel: '이미지 선택',
+    });
+
+    if (!fileUris || fileUris.length === 0) {return;}
+
+    const images: string[] = [];
+    for (const uri of fileUris) {
+      try {
+        const fileData = await vscode.workspace.fs.readFile(uri);
+        const base64 = Buffer.from(fileData).toString('base64');
+        // Detect MIME type from extension
+        const ext = uri.fsPath.split('.').pop()?.toLowerCase() || 'png';
+        const mimeMap: Record<string, string> = {
+          png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+          gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+        };
+        const mime = mimeMap[ext] || 'image/png';
+        images.push(`data:${mime};base64,${base64}`);
+      } catch (e: any) {
+        vscode.window.showWarningMessage(`이미지 로드 실패: ${uri.fsPath}`);
+      }
+    }
+
+    if (images.length > 0) {
+      this._view?.webview.postMessage({
+        type: 'imagesSelected',
+        images,
+      });
     }
   }
 
@@ -293,16 +345,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data: blob:;">
   <link href="${styleUri}" rel="stylesheet">
-  <title>Luca Offline Chat</title>
+  <title>LICA Offline Chat</title>
 </head>
 <body>
   <div id="app">
     <header id="header">
       <div class="header-left">
         <span class="header-icon">🤖</span>
-        <span class="header-title">AI 인턴 (E4B)</span>
+        <span class="header-title">LICA</span>
       </div>
       <div class="header-right">
         <select id="model-select" title="모델 선택"></select>
@@ -317,9 +369,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     <div id="chat-messages">
       <div class="welcome-message">
         <div class="welcome-icon">🧑‍💻</div>
-        <h3>Luca Offline</h3>
-        <p>인터넷 없이도 동작하는 로컬 AI 코딩 어시스턴트입니다.</p>
-        <p class="hint">코드를 선택 후 <kbd>Ctrl+Shift+L</kbd>로 질문할 수 있어요</p>
+        <h3>LICA Offline</h3>
+        <p>인터넷 없이도 동작하는 멀티모달 로컬 AI 코딩 어시스턴트입니다.</p>
+        <p class="hint">📷 이미지를 붙여넣기(Ctrl+V) 하거나 드래그해서 질문할 수 있어요</p>
+        <p class="hint">⌨️ 코드를 선택 후 <kbd>Ctrl+Shift+L</kbd>로 질문할 수 있어요</p>
       </div>
     </div>
 
@@ -327,8 +380,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       <div id="stop-btn-container" class="hidden">
         <button id="btn-stop">■ 중단</button>
       </div>
+      <div id="image-preview-bar" class="hidden"></div>
       <div class="input-wrapper">
-        <textarea id="user-input" placeholder="메시지를 입력하세요... (Enter로 전송, Shift+Enter로 줄바꿈)" rows="1"></textarea>
+        <div class="input-actions">
+          <button id="btn-attach" title="이미지 첨부 (+)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1v14M1 8h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+            </svg>
+          </button>
+        </div>
+        <textarea id="user-input" placeholder="메시지 입력... (이미지: 붙여넣기/드래그)" rows="1"></textarea>
         <button id="btn-send" title="전송">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M1 1.5L15 8L1 14.5V9.5L10 8L1 6.5V1.5Z"/>
@@ -337,6 +398,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       </div>
     </div>
   </div>
+
+  <div id="drop-overlay" class="hidden">
+    <div class="drop-overlay-content">
+      <div class="drop-icon">📷</div>
+      <div>이미지를 여기에 놓으세요</div>
+    </div>
+  </div>
+
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

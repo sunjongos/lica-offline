@@ -8,22 +8,35 @@
   const btnSend = document.getElementById('btn-send');
   const btnClear = document.getElementById('btn-clear');
   const btnStop = document.getElementById('btn-stop');
+  const btnAttach = document.getElementById('btn-attach');
   const stopContainer = document.getElementById('stop-btn-container');
   const modelSelect = document.getElementById('model-select');
   const connectionBanner = document.getElementById('connection-banner');
+  const imagePreviewBar = document.getElementById('image-preview-bar');
+  const dropOverlay = document.getElementById('drop-overlay');
 
   let isStreaming = false;
   let currentStreamEl = null;
   let streamBuffer = '';
   let welcomeShown = true;
+  let pendingImages = []; // Array of data URIs
 
   // ===== Initialize =====
   vscode.postMessage({ type: 'ready' });
 
   // ===== Event Listeners =====
   btnSend.addEventListener('click', sendMessage);
-  btnClear.addEventListener('click', () => vscode.postMessage({ type: 'clearChat' }));
+  btnClear.addEventListener('click', () => {
+    pendingImages = [];
+    updateImagePreview();
+    vscode.postMessage({ type: 'clearChat' });
+  });
   btnStop.addEventListener('click', () => vscode.postMessage({ type: 'stopGeneration' }));
+
+  // Image attach button — triggers native file picker
+  btnAttach.addEventListener('click', () => {
+    vscode.postMessage({ type: 'pickImage' });
+  });
 
   modelSelect.addEventListener('change', () => {
     vscode.postMessage({ type: 'switchModel', model: modelSelect.value });
@@ -42,14 +55,83 @@
     userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
   });
 
+  // ===== Clipboard Paste (Ctrl+V) for images =====
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        if (blob) {
+          blobToDataURI(blob).then((dataUri) => {
+            pendingImages.push(dataUri);
+            updateImagePreview();
+          });
+        }
+      }
+    }
+  });
+
+  // ===== Drag & Drop for images =====
+  let dragCounter = 0;
+
+  document.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragCounter++;
+    if (hasImageFiles(e)) {
+      dropOverlay.classList.remove('hidden');
+    }
+  });
+
+  document.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      dropOverlay.classList.add('hidden');
+    }
+  });
+
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    dropOverlay.classList.add('hidden');
+
+    const files = e.dataTransfer?.files;
+    if (!files) return;
+
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        blobToDataURI(file).then((dataUri) => {
+          pendingImages.push(dataUri);
+          updateImagePreview();
+        });
+      }
+    }
+  });
+
   // ===== Message Handling =====
   function sendMessage() {
     const text = userInput.value.trim();
-    if (!text || isStreaming) return;
+    if ((!text && pendingImages.length === 0) || isStreaming) return;
 
-    vscode.postMessage({ type: 'sendMessage', text });
+    const msgText = text || '이 이미지를 분석해주세요.';
+    vscode.postMessage({
+      type: 'sendMessage',
+      text: msgText,
+      images: [...pendingImages],
+    });
+
     userInput.value = '';
     userInput.style.height = 'auto';
+    pendingImages = [];
+    updateImagePreview();
   }
 
   // ===== Receive messages from extension =====
@@ -59,7 +141,7 @@
     switch (data.type) {
       case 'addMessage':
         removeWelcome();
-        addMessageEl(data.role, data.content);
+        addMessageEl(data.role, data.content, data.images || []);
         break;
 
       case 'startStreaming':
@@ -122,8 +204,43 @@
           connectionBanner.classList.remove('hidden');
         }
         break;
+
+      case 'imagesSelected':
+        // Images returned from native file picker
+        if (data.images && data.images.length > 0) {
+          pendingImages.push(...data.images);
+          updateImagePreview();
+          userInput.focus();
+        }
+        break;
     }
   });
+
+  // ===== Image Preview Bar =====
+  function updateImagePreview() {
+    if (pendingImages.length === 0) {
+      imagePreviewBar.classList.add('hidden');
+      imagePreviewBar.innerHTML = '';
+      return;
+    }
+
+    imagePreviewBar.classList.remove('hidden');
+    imagePreviewBar.innerHTML = pendingImages.map((uri, idx) => `
+      <div class="image-thumb-wrapper">
+        <img src="${uri}" class="image-thumb" alt="첨부 이미지 ${idx + 1}" />
+        <button class="image-thumb-remove" data-idx="${idx}" title="제거">✕</button>
+      </div>
+    `).join('');
+
+    // Bind remove buttons
+    imagePreviewBar.querySelectorAll('.image-thumb-remove').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        pendingImages.splice(idx, 1);
+        updateImagePreview();
+      });
+    });
+  }
 
   // ===== DOM Helpers =====
   function removeWelcome() {
@@ -139,18 +256,28 @@
     chatMessages.innerHTML = `
       <div class="welcome-message">
         <div class="welcome-icon">🧑‍💻</div>
-        <h3>Luca Offline</h3>
-        <p>인터넷 없이도 동작하는 로컬 AI 코딩 어시스턴트입니다.</p>
-        <p class="hint">코드를 선택 후 <kbd>Ctrl+Shift+L</kbd>로 질문할 수 있어요</p>
+        <h3>LICA Offline</h3>
+        <p>인터넷 없이도 동작하는 멀티모달 로컬 AI 코딩 어시스턴트입니다.</p>
+        <p class="hint">📷 이미지를 붙여넣기(Ctrl+V) 하거나 드래그해서 질문할 수 있어요</p>
+        <p class="hint">⌨️ 코드를 선택 후 <kbd>Ctrl+Shift+L</kbd>로 질문할 수 있어요</p>
       </div>`;
   }
 
-  function addMessageEl(role, content) {
+  function addMessageEl(role, content, images) {
     const el = document.createElement('div');
     el.className = `message ${role}`;
-    const roleLabel = role === 'user' ? '👤 나' : '🤖 인턴';
+    const roleLabel = role === 'user' ? '👤 나' : '🤖 LICA';
+
+    let imagesHtml = '';
+    if (images && images.length > 0) {
+      imagesHtml = `<div class="message-images">${images.map((src) =>
+        `<img src="${src}" class="message-image" alt="첨부 이미지" />`
+      ).join('')}</div>`;
+    }
+
     el.innerHTML = `
       <div class="message-role">${roleLabel}</div>
+      ${imagesHtml}
       <div class="message-content"></div>`;
     renderMarkdown(el.querySelector('.message-content'), content, false);
     chatMessages.appendChild(el);
@@ -162,7 +289,7 @@
     const el = document.createElement('div');
     el.className = 'message assistant';
     el.innerHTML = `
-      <div class="message-role">🤖 인턴</div>
+      <div class="message-role">🤖 LICA</div>
       <div class="message-content streaming-cursor"></div>`;
     chatMessages.appendChild(el);
     scrollToBottom();
@@ -195,6 +322,25 @@
     requestAnimationFrame(() => {
       chatMessages.scrollTop = chatMessages.scrollHeight;
     });
+  }
+
+  // ===== Utility =====
+  function blobToDataURI(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function hasImageFiles(e) {
+    if (e.dataTransfer?.types) {
+      for (const t of e.dataTransfer.types) {
+        if (t === 'Files') return true;
+      }
+    }
+    return false;
   }
 
   // ===== Markdown Renderer (Lightweight, no deps) =====
